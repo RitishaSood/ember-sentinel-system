@@ -85,31 +85,66 @@ serve(async (req) => {
         severity = 'critical';
       }
 
-      // Create alert if threshold exceeded
+      // Create or update alert if threshold exceeded
       if (alertType) {
-        const { data: newAlert, error: alertError } = await supabaseClient
+        // Check if there's already an active alert for this location
+        const { data: existingAlert } = await supabaseClient
           .from('alerts')
-          .insert({
-            location_id: locationId,
-            alert_type: alertType,
-            severity,
-            status: 'active',
-            sensor_values: sensors,
-            timestamp: new Date().toISOString(),
-          })
-          .select()
+          .select('*')
+          .eq('location_id', locationId)
+          .eq('status', 'active')
           .single();
 
-        if (alertError) {
-          console.error('[Alert Manager] Error creating alert:', alertError);
-          throw alertError;
-        }
+        if (existingAlert) {
+          // Update existing alert
+          const { data: updatedAlert, error: updateError } = await supabaseClient
+            .from('alerts')
+            .update({
+              alert_type: alertType,
+              severity,
+              sensor_values: sensors,
+              timestamp: new Date().toISOString(),
+            })
+            .eq('id', existingAlert.id)
+            .select()
+            .single();
 
-        console.log('[Alert Manager] Alert created:', newAlert);
-        return new Response(
-          JSON.stringify({ success: true, alert: newAlert, created: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          if (updateError) {
+            console.error('[Alert Manager] Error updating alert:', updateError);
+            throw updateError;
+          }
+
+          console.log('[Alert Manager] Alert updated:', updatedAlert);
+          return new Response(
+            JSON.stringify({ success: true, alert: updatedAlert, updated: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // Create new alert
+          const { data: newAlert, error: alertError } = await supabaseClient
+            .from('alerts')
+            .insert({
+              location_id: locationId,
+              alert_type: alertType,
+              severity,
+              status: 'active',
+              sensor_values: sensors,
+              timestamp: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+          if (alertError) {
+            console.error('[Alert Manager] Error creating alert:', alertError);
+            throw alertError;
+          }
+
+          console.log('[Alert Manager] Alert created:', newAlert);
+          return new Response(
+            JSON.stringify({ success: true, alert: newAlert, created: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       } else {
         console.log('[Alert Manager] Sensor values within normal range');
         return new Response(
