@@ -60,35 +60,29 @@ serve(async (req) => {
       
       // Define thresholds for alerts
       const thresholds = {
-        temperature: { warning: 40, critical: 60 },
-        gas: { warning: 300, critical: 500 },
-        flame: { detected: '1' }, // String value from sensor
-        humidity: { low: 20, high: 80 }
+        temperature: { critical: 25 },
+        gas: { critical: 300 },
+        flame: { detected: '0' }, // 0 = flame detected, 1 = no flame
+        pir: { detected: '0' } // 0 = motion detected, 1 = no motion
       };
 
       let alertType = null;
-      let severity = 'low';
+      let severity = 'critical';
       
-      // Check for fire (flame detected)
-      if (sensors.flame === '1') {
+      // Check for fire (flame detected when value is 0)
+      if (sensors.flame === '0') {
         alertType = 'fire';
         severity = 'critical';
       }
       // Check for gas leak
-      else if (sensors.gas >= thresholds.gas.critical) {
+      else if (sensors.gas > thresholds.gas.critical) {
         alertType = 'gas_leak';
         severity = 'critical';
-      } else if (sensors.gas >= thresholds.gas.warning) {
-        alertType = 'gas_leak';
-        severity = 'high';
       }
       // Check for high temperature
-      else if (sensors.temperature >= thresholds.temperature.critical) {
+      else if (sensors.temperature > thresholds.temperature.critical) {
         alertType = 'temperature';
-        severity = 'high';
-      } else if (sensors.temperature >= thresholds.temperature.warning) {
-        alertType = 'temperature';
-        severity = 'medium';
+        severity = 'critical';
       }
 
       // Create alert if threshold exceeded
