@@ -21,23 +21,34 @@ const corsHeaders = {
  * @returns Object containing sensor values or null
  */
 async function fetchLatestSensorValues(location: any) {
-  // TODO: Implement ThingSpeak data fetch here
-  // Example implementation:
-  // const url = `https://api.thingspeak.com/channels/${location.thingspeak_channel_id}/feeds/last.json?api_key=${location.thingspeak_read_key}`;
-  // const response = await fetch(url);
-  // const data = await response.json();
-  // return {
-  //   flame: data.field1,
-  //   gas: parseFloat(data.field2),
-  //   temperature: parseFloat(data.field3),
-  //   humidity: parseFloat(data.field4),
-  //   pir: data.field5,
-  // };
-  
-  console.log('[ThingSpeak Service] fetchLatestSensorValues called for location:', location.name);
-  console.log('[ThingSpeak Service] TODO: Implement ThingSpeak API integration');
-  
-  return null;
+  try {
+    const url = `https://api.thingspeak.com/channels/${location.thingspeak_channel_id}/feeds/last.json?api_key=${location.thingspeak_read_key}`;
+    
+    console.log('[ThingSpeak Service] Fetching latest data for location:', location.name);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error('[ThingSpeak Service] API error:', response.status, response.statusText);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    console.log('[ThingSpeak Service] Received data:', data);
+    
+    return {
+      flame: data.field1,
+      gas: parseFloat(data.field2),
+      temperature: parseFloat(data.field3),
+      humidity: parseFloat(data.field4),
+      pir: data.field5,
+      timestamp: data.created_at,
+    };
+  } catch (error) {
+    console.error('[ThingSpeak Service] Error fetching latest values:', error);
+    return null;
+  }
 }
 
 /**
@@ -48,24 +59,38 @@ async function fetchLatestSensorValues(location: any) {
  * @returns Array of historical sensor readings or empty array
  */
 async function fetchSensorHistory(location: any, results: number = 100) {
-  // TODO: Implement ThingSpeak history fetch here
-  // Example implementation:
-  // const url = `https://api.thingspeak.com/channels/${location.thingspeak_channel_id}/feeds.json?api_key=${location.thingspeak_read_key}&results=${results}`;
-  // const response = await fetch(url);
-  // const data = await response.json();
-  // return data.feeds.map((feed: any) => ({
-  //   timestamp: feed.created_at,
-  //   flame: feed.field1,
-  //   gas: parseFloat(feed.field2),
-  //   temperature: parseFloat(feed.field3),
-  //   humidity: parseFloat(feed.field4),
-  //   pir: feed.field5,
-  // }));
-  
-  console.log('[ThingSpeak Service] fetchSensorHistory called for location:', location.name);
-  console.log('[ThingSpeak Service] TODO: Implement ThingSpeak API integration');
-  
-  return [];
+  try {
+    const url = `https://api.thingspeak.com/channels/${location.thingspeak_channel_id}/feeds.json?api_key=${location.thingspeak_read_key}&results=${results}`;
+    
+    console.log('[ThingSpeak Service] Fetching history for location:', location.name, 'results:', results);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      console.error('[ThingSpeak Service] API error:', response.status, response.statusText);
+      return [];
+    }
+    
+    const data = await response.json();
+    
+    console.log('[ThingSpeak Service] Received', data.feeds?.length || 0, 'historical records');
+    
+    if (!data.feeds || !Array.isArray(data.feeds)) {
+      return [];
+    }
+    
+    return data.feeds.map((feed: any) => ({
+      timestamp: feed.created_at,
+      flame: feed.field1,
+      gas: parseFloat(feed.field2),
+      temperature: parseFloat(feed.field3),
+      humidity: parseFloat(feed.field4),
+      pir: feed.field5,
+    }));
+  } catch (error) {
+    console.error('[ThingSpeak Service] Error fetching history:', error);
+    return [];
+  }
 }
 
 serve(async (req) => {
