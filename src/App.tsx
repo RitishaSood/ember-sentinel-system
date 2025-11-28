@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Locations from "./pages/Locations";
+import LocationDetails from "./pages/LocationDetails";
 import AlertDetails from "./pages/AlertDetails";
 import MapView from "./pages/MapView";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/locations" element={<Locations />} />
+          <Route path="/location/:id" element={<LocationDetails />} />
           <Route path="/alert/:id" element={<AlertDetails />} />
           <Route path="/map" element={<MapView />} />
           <Route path="*" element={<NotFound />} />

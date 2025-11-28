@@ -38,7 +38,10 @@ export const LocationCard = ({ id, name, region, status, latitude, longitude, on
   const config = statusConfig[status];
 
   return (
-    <Card className={`transition-all hover:scale-[1.02] ${status === "alert" ? "border-primary" : ""}`}>
+    <Card 
+      className={`transition-all hover:scale-[1.02] cursor-pointer ${status === "alert" ? "border-primary" : ""}`}
+      onClick={() => navigate(`/location/${id}`)}
+    >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
@@ -65,7 +68,10 @@ export const LocationCard = ({ id, name, region, status, latitude, longitude, on
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => navigate(`/map?location=${id}`)}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/map?location=${id}`);
+              }}
               className="flex-1"
             >
               View on Map
@@ -74,7 +80,10 @@ export const LocationCard = ({ id, name, region, status, latitude, longitude, on
               <Button 
                 size="sm" 
                 variant="default"
-                onClick={() => onCheckSensors(id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCheckSensors(id);
+                }}
                 disabled={isChecking}
                 className="flex-1"
               >
