@@ -66,10 +66,13 @@ const Alerts = () => {
 
   const updateAlertStatus = async (alertId: string, newStatus: "active" | "resolved" | "false_alarm" | "in_queue" | "unsolved") => {
     try {
-      const { error } = await supabase
-        .from("alerts")
-        .update({ status: newStatus })
-        .eq("id", alertId);
+      const { data, error } = await supabase.functions.invoke('alert-manager', {
+        body: {
+          action: 'update',
+          alertId,
+          status: newStatus
+        }
+      });
 
       if (error) throw error;
 
