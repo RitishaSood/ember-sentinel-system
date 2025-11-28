@@ -38,10 +38,10 @@ async function fetchLatestSensorValues(location: any) {
     console.log('[ThingSpeak Service] Received data:', data);
     
     return {
-      flame: data.field1,
-      gas: parseFloat(data.field2),
-      temperature: parseFloat(data.field3),
-      humidity: parseFloat(data.field4),
+      temperature: parseFloat(data.field1),
+      humidity: parseFloat(data.field2),
+      flame: data.field3,
+      gas: parseFloat(data.field4),
       pir: data.field5,
       timestamp: data.created_at,
     };
@@ -81,10 +81,10 @@ async function fetchSensorHistory(location: any, results: number = 100) {
     
     return data.feeds.map((feed: any) => ({
       timestamp: feed.created_at,
-      flame: feed.field1,
-      gas: parseFloat(feed.field2),
-      temperature: parseFloat(feed.field3),
-      humidity: parseFloat(feed.field4),
+      temperature: parseFloat(feed.field1),
+      humidity: parseFloat(feed.field2),
+      flame: feed.field3,
+      gas: parseFloat(feed.field4),
       pir: feed.field5,
     }));
   } catch (error) {
