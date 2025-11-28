@@ -46,12 +46,11 @@ export const GlobalAlertListener = () => {
           title = isUpdate ? '⚠️ ALERT UPDATED' : '⚠️ ALERT';
       }
 
-      // Show toast notification
+      // Show toast notification (persists until manually dismissed)
       toast({
         title,
         description: `${locationName} - ${alert.severity.toUpperCase()} severity`,
         variant: "destructive",
-        duration: 10000,
         action: (
           <button
             onClick={() => navigate(`/alert/${alert.id}`)}
