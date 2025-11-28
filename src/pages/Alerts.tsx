@@ -124,7 +124,7 @@ const Alerts = () => {
                 <div className="text-sm text-muted-foreground mt-2 space-y-1">
                   <p>🌡️ Temperature: {alert.sensor_values.temperature}°C</p>
                   <p>💨 Gas Level: {alert.sensor_values.gas}</p>
-                  <p>🔥 Flame: {alert.sensor_values.flame === '0' ? "Detected" : "None"}</p>
+                  <p>🔥 Flame: {alert.sensor_values.flame === 'FLAME' ? "🚨 Detected" : "None"}</p>
                   <p>📍 PIR: {alert.sensor_values.pir === '0' ? "Motion Detected" : "No Motion"}</p>
                 </div>
               )}
