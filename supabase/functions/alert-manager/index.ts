@@ -87,13 +87,12 @@ serve(async (req) => {
 
       // Create or update alert if threshold exceeded
       if (alertType) {
-        // Check if there's an alert for this location within the last hour
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        // Check if there's an active or in_queue alert for this location
         const { data: existingAlert } = await supabaseClient
           .from('alerts')
           .select('*')
           .eq('location_id', locationId)
-          .gte('timestamp', oneHourAgo)
+          .in('status', ['active', 'in_queue'])
           .order('timestamp', { ascending: false })
           .limit(1)
           .single();
