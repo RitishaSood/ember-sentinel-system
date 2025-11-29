@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, AlertTriangle, MapPin, BarChart3, LogOut, User, Clock } from "lucide-react";
+import { Home, AlertTriangle, MapPin, BarChart3, LogOut, User, Clock, Map } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,6 +21,7 @@ const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Alerts", url: "/alerts", icon: AlertTriangle },
   { title: "Locations Status", url: "/locations-status", icon: MapPin },
+  { title: "View Map", url: "/map", icon: Map },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Profile", url: "/profile", icon: User },
 ];
