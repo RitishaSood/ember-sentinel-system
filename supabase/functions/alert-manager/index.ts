@@ -157,12 +157,23 @@ serve(async (req) => {
     }
 
     if (action === 'update') {
-      // Update alert status
+      // Update alert status - only authority users can do this
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) throw new Error('No authorization header');
 
       const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
       if (!user) throw new Error('Unauthorized');
+
+      // Check if user is an authority user
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('user_type')
+        .eq('user_id', user.id)
+        .single();
+
+      if (profileError || profile?.user_type !== 'authority') {
+        throw new Error('Only authority users can update alert status');
+      }
 
       const { error: updateError } = await supabaseClient
         .from('alerts')

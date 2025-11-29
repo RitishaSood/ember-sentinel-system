@@ -30,6 +30,7 @@ const Dashboard = () => {
   const [liveAlerts, setLiveAlerts] = useState<Alert[]>([]);
   const [pastCases, setPastCases] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthorityUser, setIsAuthorityUser] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -54,6 +55,20 @@ const Dashboard = () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       navigate("/auth");
+      return;
+    }
+
+    // Check user type
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('user_id', session.user.id)
+        .single();
+
+      setIsAuthorityUser(profile?.user_type === 'authority');
+    } catch (error) {
+      console.error('Error checking user type:', error);
     }
   };
 
@@ -189,6 +204,7 @@ const Dashboard = () => {
                   severity={alert.severity}
                   status={alert.status}
                   onStatusChange={handleStatusChange}
+                  isAuthorityUser={isAuthorityUser}
                 />
               ))
             )}

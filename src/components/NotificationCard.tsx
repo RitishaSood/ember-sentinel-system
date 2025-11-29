@@ -13,6 +13,7 @@ interface NotificationCardProps {
   severity: "low" | "medium" | "high" | "critical";
   status: "active" | "resolved" | "false_alarm" | "in_queue" | "unsolved";
   onStatusChange?: (alertId: string, newStatus: string) => void;
+  isAuthorityUser?: boolean;
 }
 
 const alertIcons = {
@@ -37,6 +38,7 @@ export const NotificationCard = ({
   severity,
   status,
   onStatusChange,
+  isAuthorityUser = false,
 }: NotificationCardProps) => {
   const navigate = useNavigate();
   const Icon = alertIcons[alertType];
@@ -86,32 +88,34 @@ export const NotificationCard = ({
             </Badge>
           </div>
           
-          <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              size="sm" 
-              variant={status === "in_queue" ? "default" : "outline"}
-              onClick={() => handleStatusChange("in_queue")}
-              className="flex-1 min-w-[100px]"
-            >
-              In Queue
-            </Button>
-            <Button 
-              size="sm" 
-              variant={status === "resolved" ? "default" : "outline"}
-              onClick={() => handleStatusChange("resolved")}
-              className="flex-1 min-w-[100px]"
-            >
-              Solved
-            </Button>
-            <Button 
-              size="sm" 
-              variant={status === "unsolved" ? "default" : "outline"}
-              onClick={() => handleStatusChange("unsolved")}
-              className="flex-1 min-w-[100px]"
-            >
-              Unsolved
-            </Button>
-          </div>
+          {isAuthorityUser ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button 
+                size="sm" 
+                variant={status === "in_queue" ? "default" : "outline"}
+                onClick={() => handleStatusChange("in_queue")}
+                className="flex-1 min-w-[100px]"
+              >
+                In Queue
+              </Button>
+              <Button 
+                size="sm" 
+                variant={status === "resolved" ? "default" : "outline"}
+                onClick={() => handleStatusChange("resolved")}
+                className="flex-1 min-w-[100px]"
+              >
+                Solved
+              </Button>
+              <Button 
+                size="sm" 
+                variant={status === "unsolved" ? "default" : "outline"}
+                onClick={() => handleStatusChange("unsolved")}
+                className="flex-1 min-w-[100px]"
+              >
+                Unsolved
+              </Button>
+            </div>
+          ) : null}
           
           <Button 
             size="sm" 

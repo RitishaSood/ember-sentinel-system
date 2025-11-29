@@ -25,8 +25,10 @@ const Alerts = () => {
   const [pastAlerts, setPastAlerts] = useState<Alert[]>([]);
   const [solvedCases, setSolvedCases] = useState<Alert[]>([]);
   const [unsolvedCases, setUnsolvedCases] = useState<Alert[]>([]);
+  const [isAuthorityUser, setIsAuthorityUser] = useState(false);
 
   useEffect(() => {
+    checkUserType();
     fetchAlerts();
     
     const channel = supabase
@@ -40,6 +42,23 @@ const Alerts = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const checkUserType = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('user_id', user.id)
+        .single();
+
+      setIsAuthorityUser(profile?.user_type === 'authority');
+    } catch (error) {
+      console.error('Error checking user type:', error);
+    }
+  };
 
   const fetchAlerts = async () => {
     try {
@@ -134,32 +153,34 @@ const Alerts = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button 
-              size="sm" 
-              variant={alert.status === "in_queue" ? "default" : "outline"}
-              onClick={() => updateAlertStatus(alert.id, "in_queue")}
-              className="flex-1 min-w-[120px]"
-            >
-              In Queue
-            </Button>
-            <Button 
-              size="sm" 
-              variant={alert.status === "resolved" ? "default" : "outline"}
-              onClick={() => updateAlertStatus(alert.id, "resolved")}
-              className="flex-1 min-w-[120px]"
-            >
-              Solved
-            </Button>
-            <Button 
-              size="sm" 
-              variant={alert.status === "unsolved" ? "default" : "outline"}
-              onClick={() => updateAlertStatus(alert.id, "unsolved")}
-              className="flex-1 min-w-[120px]"
-            >
-              Unsolved
-            </Button>
-          </div>
+          {isAuthorityUser && (
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                size="sm" 
+                variant={alert.status === "in_queue" ? "default" : "outline"}
+                onClick={() => updateAlertStatus(alert.id, "in_queue")}
+                className="flex-1 min-w-[120px]"
+              >
+                In Queue
+              </Button>
+              <Button 
+                size="sm" 
+                variant={alert.status === "resolved" ? "default" : "outline"}
+                onClick={() => updateAlertStatus(alert.id, "resolved")}
+                className="flex-1 min-w-[120px]"
+              >
+                Solved
+              </Button>
+              <Button 
+                size="sm" 
+                variant={alert.status === "unsolved" ? "default" : "outline"}
+                onClick={() => updateAlertStatus(alert.id, "unsolved")}
+                className="flex-1 min-w-[120px]"
+              >
+                Unsolved
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
