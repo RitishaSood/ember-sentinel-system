@@ -24,6 +24,27 @@ const Locations = () => {
 
   useEffect(() => {
     fetchLocations();
+
+    // Set up real-time subscription for location updates
+    const channel = supabase
+      .channel('locations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'locations'
+        },
+        (payload) => {
+          console.log('Location change detected:', payload);
+          fetchLocations(); // Refresh locations when any change occurs
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchLocations = async () => {
