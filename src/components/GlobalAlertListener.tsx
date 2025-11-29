@@ -7,22 +7,26 @@ import { useNavigate } from "react-router-dom";
 export const GlobalAlertListener = () => {
   const navigate = useNavigate();
   const shownAlerts = useRef<Set<string>>(new Set());
-  const alertToasts = useRef<Map<string, { dismiss: () => void; update: (props: any) => void }>>(new Map());
+  const alertToasts = useRef<Map<string, { dismiss: () => void }>>(new Map());
 
   useEffect(() => {
-    const handleAlert = async (payload: any, isUpdate: boolean = false) => {
+    const handleAlert = async (payload: any) => {
       const alert = payload.new;
-      const alertId = alert.id as string;
-      const status = alert.status as string | null;
-      const eventType = (payload.eventType || payload.type || (isUpdate ? "UPDATE" : "INSERT")) as string;
+      if (!alert) return;
 
-      console.log("Alert received:", { alertId, eventType, status, type: alert.alert_type });
+      const alertId = String(alert.id);
+      const status = (alert.status as string | null) ?? "active";
 
-      // If alert is solved/unsolved, dismiss any existing toast and stop
-      if (status === "solved" || status === "unsolved") {
+      console.log("GlobalAlertListener received alert:", {
+        alertId,
+        status,
+        type: alert.alert_type,
+      });
+
+      // If alert has been closed / moved out of live cases, dismiss any existing toast
+      if (status === "resolved" || status === "unsolved" || status === "false_alarm") {
         const existing = alertToasts.current.get(alertId);
         if (existing) {
-          console.log("Dismissing toast for resolved alert:", alertId);
           existing.dismiss();
           alertToasts.current.delete(alertId);
         }
@@ -30,10 +34,19 @@ export const GlobalAlertListener = () => {
         return;
       }
 
-      // From here on, we handle active / in-queue alerts and keep a single toast per alert
+      // Only show notifications for active / in-queue alerts
+      if (status !== "active" && status !== "in_queue") {
+        return;
+      }
+
+      // If we've already shown this alert, keep the existing toast (no re-pop)
+      if (shownAlerts.current.has(alertId)) {
+        return;
+      }
+
       shownAlerts.current.add(alertId);
-      
-      // Fetch location name
+
+      // Fetch location name for description
       const { data: location } = await supabase
         .from("locations")
         .select("name")
@@ -44,7 +57,6 @@ export const GlobalAlertListener = () => {
 
       // Determine title based on alert type
       let title = "";
-
       switch (alert.alert_type) {
         case "fire":
           title = "🔥 FIRE DETECTED";
@@ -59,23 +71,9 @@ export const GlobalAlertListener = () => {
           title = "⚠️ ALERT";
       }
 
-      const description = `Location: ${locationName}\nSeverity: ${alert.severity?.toString().toUpperCase()}`;
+      const description = `Location: ${locationName}\nSeverity: ${String(alert.severity ?? "").toUpperCase()}`;
 
-      const existing = alertToasts.current.get(alertId);
-
-      if (existing) {
-        console.log("Updating existing alert toast:", alertId);
-        existing.update({
-          title,
-          description,
-          variant: "destructive",
-          open: true,
-        });
-        return;
-      }
-
-      console.log("Creating new alert toast:", alertId);
-      const newToast = toast({
+      const handle = toast({
         title,
         description,
         variant: "destructive",
@@ -89,38 +87,29 @@ export const GlobalAlertListener = () => {
         ),
       });
 
-      alertToasts.current.set(alertId, newToast);
+      alertToasts.current.set(alertId, { dismiss: handle.dismiss });
 
-      // Play alert sound only when toast is first created
+      // Play alert sound when toast is first created
       try {
         const audio = new Audio("/alert-sound.mp3");
         audio.play().catch(() => {
-          // Silently fail if audio cannot be played
+          // Ignore audio errors
         });
-      } catch (error) {
-        // Silently fail if audio cannot be played
+      } catch {
+        // Ignore audio errors
       }
     };
 
     const channel = supabase
-      .channel('global-alerts')
+      .channel("global-alerts")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'alerts'
+          event: "*",
+          schema: "public",
+          table: "alerts",
         },
-        (payload) => handleAlert(payload, false)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'alerts'
-        },
-        (payload) => handleAlert(payload, true)
+        handleAlert
       )
       .subscribe();
 
