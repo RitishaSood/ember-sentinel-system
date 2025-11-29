@@ -11,14 +11,23 @@ export const GlobalAlertListener = () => {
   useEffect(() => {
     const handleAlert = async (payload: any, isUpdate: boolean = false) => {
       const alert = payload.new;
-      // Only show notification once per location, or if it's an update to existing alert
-      const locationKey = alert.location_id;
-      if (!isUpdate && shownAlerts.current.has(locationKey)) {
+      const alertId = alert.id;
+      
+      // For updates, only handle status changes to solved/unsolved (remove from shown list)
+      if (isUpdate) {
+        if (alert.status === 'solved' || alert.status === 'unsolved') {
+          shownAlerts.current.delete(alertId);
+        }
+        return; // Don't show notifications for updates
+      }
+      
+      // Only show notification once per alert ID and only for active alerts
+      if (shownAlerts.current.has(alertId) || alert.status !== 'active') {
         return;
       }
       
-      // Mark this location as having shown an alert
-      shownAlerts.current.add(locationKey);
+      // Mark this alert as shown
+      shownAlerts.current.add(alertId);
       
       // Fetch location name
       const { data: location } = await supabase
@@ -29,27 +38,27 @@ export const GlobalAlertListener = () => {
 
       const locationName = location?.name || 'Unknown Location';
       
-      // Determine icon and title based on alert type
+      // Determine title based on alert type
       let title = '';
       
       switch (alert.alert_type) {
         case 'fire':
-          title = isUpdate ? '🔥 FIRE ALERT UPDATED' : '🔥 FIRE DETECTED';
+          title = '🔥 FIRE DETECTED';
           break;
         case 'gas_leak':
-          title = isUpdate ? '💨 GAS LEAK UPDATED' : '💨 GAS LEAK DETECTED';
+          title = '💨 GAS LEAK DETECTED';
           break;
         case 'temperature':
-          title = isUpdate ? '🌡️ TEMPERATURE UPDATED' : '🌡️ HIGH TEMPERATURE';
+          title = '🌡️ HIGH TEMPERATURE';
           break;
         default:
-          title = isUpdate ? '⚠️ ALERT UPDATED' : '⚠️ ALERT';
+          title = '⚠️ ALERT';
       }
 
       // Show toast notification (persists until manually dismissed)
       toast({
         title,
-        description: `${locationName} - ${alert.severity.toUpperCase()} severity`,
+        description: `Location: ${locationName}\nSeverity: ${alert.severity.toUpperCase()}`,
         variant: "destructive",
         action: (
           <button
@@ -61,16 +70,14 @@ export const GlobalAlertListener = () => {
         ),
       });
 
-      // Play alert sound only for new alerts, not updates
-      if (!isUpdate) {
-        try {
-          const audio = new Audio('/alert-sound.mp3');
-          audio.play().catch(() => {
-            // Silently fail if audio cannot be played
-          });
-        } catch (error) {
+      // Play alert sound for new alerts
+      try {
+        const audio = new Audio('/alert-sound.mp3');
+        audio.play().catch(() => {
           // Silently fail if audio cannot be played
-        }
+        });
+      } catch (error) {
+        // Silently fail if audio cannot be played
       }
     };
 
