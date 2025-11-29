@@ -165,6 +165,8 @@ export type Database = {
           created_at: string
           department: string | null
           fire_station: string | null
+          fire_station_latitude: number | null
+          fire_station_longitude: number | null
           full_name: string | null
           id: string
           phone: string | null
@@ -179,6 +181,8 @@ export type Database = {
           created_at?: string
           department?: string | null
           fire_station?: string | null
+          fire_station_latitude?: number | null
+          fire_station_longitude?: number | null
           full_name?: string | null
           id?: string
           phone?: string | null
@@ -193,6 +197,8 @@ export type Database = {
           created_at?: string
           department?: string | null
           fire_station?: string | null
+          fire_station_latitude?: number | null
+          fire_station_longitude?: number | null
           full_name?: string | null
           id?: string
           phone?: string | null
