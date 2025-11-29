@@ -40,8 +40,35 @@ const LocationsStatus = () => {
         }
       });
     }, 30000);
+
+    // Set up real-time subscription for location updates
+    const channel = supabase
+      .channel('locations-status-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'locations'
+        },
+        (payload) => {
+          console.log('Location status change detected:', payload);
+          // Refresh sensor data for the changed location
+          const updatedLocation = payload.new as Location | null;
+          if (updatedLocation?.id) {
+            const location = locations.find(loc => loc.id === updatedLocation.id);
+            if (location && location.thingspeak_channel_id && location.thingspeak_read_key) {
+              fetchSensorData(location.id, location.name, location.thingspeak_channel_id, location.thingspeak_read_key);
+            }
+          }
+        }
+      )
+      .subscribe();
     
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [locations]);
 
   const fetchLocations = async () => {
