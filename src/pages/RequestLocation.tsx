@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { MapPin, Clock, CheckCircle, XCircle } from "lucide-react";
+import { MapPin, Clock, CheckCircle, XCircle, Navigation } from "lucide-react";
 
 interface LocationRequest {
   id: string;
@@ -26,6 +26,7 @@ const RequestLocation = () => {
   const [requests, setRequests] = useState<LocationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [formData, setFormData] = useState({
     location_name: "",
     region: "",
@@ -149,6 +150,41 @@ const RequestLocation = () => {
     }
   };
 
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support location access.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormData({
+          ...formData,
+          latitude: position.coords.latitude.toString(),
+          longitude: position.coords.longitude.toString(),
+        });
+        toast({
+          title: "Location captured",
+          description: "Your current location has been set.",
+        });
+        setGettingLocation(false);
+      },
+      (error) => {
+        toast({
+          title: "Location access denied",
+          description: "Please allow location access or enter coordinates manually.",
+          variant: "destructive",
+        });
+        setGettingLocation(false);
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -185,31 +221,47 @@ const RequestLocation = () => {
                 />
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    step="any"
-                    value={formData.latitude}
-                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                    placeholder="28.6139"
-                    required
-                  />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>Location Coordinates</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={getCurrentLocation}
+                    disabled={gettingLocation}
+                  >
+                    <Navigation className="h-4 w-4 mr-2" />
+                    {gettingLocation ? "Getting Location..." : "Use Current Location"}
+                  </Button>
                 </div>
+                
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="latitude">Latitude</Label>
+                    <Input
+                      id="latitude"
+                      type="number"
+                      step="any"
+                      value={formData.latitude}
+                      onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                      placeholder="28.6139"
+                      required
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    step="any"
-                    value={formData.longitude}
-                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                    placeholder="77.2090"
-                    required
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="longitude">Longitude</Label>
+                    <Input
+                      id="longitude"
+                      type="number"
+                      step="any"
+                      value={formData.longitude}
+                      onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                      placeholder="77.2090"
+                      required
+                    />
+                  </div>
                 </div>
               </div>
 

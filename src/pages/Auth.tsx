@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Flame } from "lucide-react";
+import { Flame, MapPin } from "lucide-react";
 import { z } from "zod";
 
 const loginSchema = z.object({
@@ -25,6 +25,7 @@ const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({ email: "", password: "", fullName: "" });
+  const [capturedLocation, setCapturedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -101,11 +102,19 @@ const Auth = () => {
       if (signUpError) throw signUpError;
 
       if (authData.user) {
-        await supabase.from("profiles").insert({
+        const profileData: any = {
           user_id: authData.user.id,
           full_name: validated.fullName,
           user_type: userType,
-        });
+        };
+
+        // If authority user and location was captured, add fire station coordinates
+        if (userType === "authority" && capturedLocation) {
+          profileData.fire_station_latitude = capturedLocation.latitude;
+          profileData.fire_station_longitude = capturedLocation.longitude;
+        }
+
+        await supabase.from("profiles").insert(profileData);
       }
 
       toast({
@@ -129,6 +138,37 @@ const Auth = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const captureFireStationLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support location access.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setCapturedLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        toast({
+          title: "Fire station location captured",
+          description: "Your fire station location has been recorded.",
+        });
+      },
+      (error) => {
+        toast({
+          title: "Location access denied",
+          description: "Please allow location access to set fire station location.",
+          variant: "destructive",
+        });
+      }
+    );
   };
 
   return (
@@ -267,6 +307,23 @@ const Auth = () => {
                           onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
                           required
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Fire Station Location</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full"
+                          onClick={captureFireStationLocation}
+                        >
+                          <MapPin className="h-4 w-4 mr-2" />
+                          {capturedLocation 
+                            ? `Location Set (${capturedLocation.latitude.toFixed(4)}, ${capturedLocation.longitude.toFixed(4)})` 
+                            : "Capture Fire Station Location"}
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Capture your fire station's location for map routing
+                        </p>
                       </div>
                       <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? "Creating account..." : "Create Authority Account"}

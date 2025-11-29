@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Navigation } from "lucide-react";
 
 interface Location {
   id: string;
@@ -25,6 +25,7 @@ const ManageLocations = () => {
   const [locations, setLocations] = useState<Location[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     region: "",
@@ -147,6 +148,41 @@ const ManageLocations = () => {
     }
   };
 
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support location access.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setGettingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormData({
+          ...formData,
+          latitude: position.coords.latitude.toString(),
+          longitude: position.coords.longitude.toString(),
+        });
+        toast({
+          title: "Location captured",
+          description: "Current location has been set.",
+        });
+        setGettingLocation(false);
+      },
+      (error) => {
+        toast({
+          title: "Location access denied",
+          description: "Please allow location access or enter coordinates manually.",
+          variant: "destructive",
+        });
+        setGettingLocation(false);
+      }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -188,6 +224,22 @@ const ManageLocations = () => {
                     placeholder="South District"
                     required
                   />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Location Coordinates</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={getCurrentLocation}
+                      disabled={gettingLocation}
+                    >
+                      <Navigation className="h-4 w-4 mr-2" />
+                      {gettingLocation ? "Getting..." : "Use Current Location"}
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
