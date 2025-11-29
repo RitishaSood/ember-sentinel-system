@@ -187,7 +187,14 @@ serve(async (req) => {
     throw new Error('Invalid action');
   } catch (error) {
     console.error('[Alert Manager] Error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
+    let message = 'Unknown error';
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      message = String(error.message);
+    } else if (typeof error === 'string') {
+      message = error;
+    }
     return new Response(
       JSON.stringify({ success: false, error: message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
