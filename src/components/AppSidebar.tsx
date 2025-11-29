@@ -1,4 +1,5 @@
-import { Home, AlertTriangle, MapPin, BarChart3, CheckCircle, LogOut, User } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, AlertTriangle, MapPin, BarChart3, LogOut, User, Clock } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,12 +23,33 @@ const menuItems = [
   { title: "Locations Status", url: "/locations-status", icon: MapPin },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Profile", url: "/profile", icon: User },
-  { title: "Solved Cases", url: "/solved-cases", icon: CheckCircle },
+];
+
+const authorityMenuItems = [
+  { title: "Pending Requests", url: "/pending-requests", icon: Clock },
 ];
 
 export function AppSidebar() {
   const { open } = useSidebar();
   const navigate = useNavigate();
+  const [isAuthority, setIsAuthority] = useState(false);
+
+  useEffect(() => {
+    checkUserType();
+  }, []);
+
+  const checkUserType = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("user_type")
+        .eq("user_id", user.id)
+        .single();
+
+      setIsAuthority(profile?.user_type === "authority");
+    }
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -64,6 +86,31 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAuthority && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Authority</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {authorityMenuItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink
+                        to={item.url}
+                        end
+                        className="flex items-center gap-3 hover:bg-accent/50 transition-colors"
+                        activeClassName="bg-accent text-accent-foreground font-medium"
+                      >
+                        <item.icon className="h-4 w-4" />
+                        {open && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-border p-4">

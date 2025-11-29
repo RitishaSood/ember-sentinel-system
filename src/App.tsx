@@ -15,7 +15,7 @@ import Analytics from "./pages/Analytics";
 import Profile from "./pages/Profile";
 import ManageLocations from "./pages/ManageLocations";
 import RequestLocation from "./pages/RequestLocation";
-import SolvedCases from "./pages/SolvedCases";
+import PendingLocationRequests from "./pages/PendingLocationRequests";
 import Locations from "./pages/Locations";
 import LocationDetails from "./pages/LocationDetails";
 import AlertDetails from "./pages/AlertDetails";
@@ -57,7 +57,7 @@ const App = () => (
           <Route path="/profile" element={<AppLayout><Profile /></AppLayout>} />
           <Route path="/manage-locations" element={<AppLayout><ManageLocations /></AppLayout>} />
           <Route path="/request-location" element={<AppLayout><RequestLocation /></AppLayout>} />
-          <Route path="/solved-cases" element={<AppLayout><SolvedCases /></AppLayout>} />
+          <Route path="/pending-requests" element={<AppLayout><PendingLocationRequests /></AppLayout>} />
           <Route path="/locations" element={<AppLayout><Locations /></AppLayout>} />
           <Route path="/location/:id" element={<AppLayout><LocationDetails /></AppLayout>} />
           <Route path="/alert/:id" element={<AppLayout><AlertDetails /></AppLayout>} />
