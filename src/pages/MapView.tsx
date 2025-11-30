@@ -318,7 +318,6 @@ const MapView = () => {
                           }}
                           icon={{
                             url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
-                            scaledSize: new google.maps.Size(40, 40),
                           }}
                           title={`${station.fire_station} - ${station.authority_name}`}
                         />
