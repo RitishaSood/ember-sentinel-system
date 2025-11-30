@@ -25,7 +25,7 @@ interface FireStation {
   authority_name: string;
 }
 
-const GOOGLE_MAPS_KEY = "AIzaSyA688wCVDAYjow3olR5ZqDyJVxe3eTEXYY";
+const GOOGLE_MAPS_KEY = "AIzaSyDXNshIIcDLhMxKZLPLPZkXbW53-IeqhhQ";
 
 const MapView = () => {
   const navigate = useNavigate();
