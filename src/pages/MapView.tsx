@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, MapPin, Navigation } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from "@react-google-maps/api";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
+import "leaflet-routing-machine";
 
 interface Location {
   id: string;
@@ -25,7 +29,103 @@ interface FireStation {
   authority_name: string;
 }
 
-const GOOGLE_MAPS_KEY = "AIzaSyDXNshIIcDLhMxKZLPLPZkXbW53-IeqhhQ";
+// Fix Leaflet default marker icon issue
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+// Custom marker icons
+const createCustomIcon = (color: string, size: number = 25) => {
+  return L.divIcon({
+    className: "custom-marker",
+    html: `<div style="
+      background-color: ${color};
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    "></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+};
+
+const alertIcon = createCustomIcon("#ef4444", 30); // Red for alerts
+const warningIcon = createCustomIcon("#f59e0b", 25); // Yellow for warnings
+const normalIcon = createCustomIcon("#22c55e", 20); // Green for normal
+const userIcon = createCustomIcon("#3b82f6", 25); // Blue for user location
+const fireStationIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+// Routing control component
+const RoutingControl: React.FC<{
+  start: L.LatLng | null;
+  end: L.LatLng | null;
+  onRouteFound: (distance: number) => void;
+}> = ({ start, end, onRouteFound }) => {
+  const map = useMap();
+  const routingControlRef = useRef<L.Routing.Control | null>(null);
+
+  useEffect(() => {
+    if (!map || !start || !end) return;
+
+    // Remove existing routing control
+    if (routingControlRef.current) {
+      map.removeControl(routingControlRef.current);
+    }
+
+    // Create new routing control
+    const control = L.Routing.control({
+      waypoints: [start, end],
+      routeWhileDragging: false,
+      addWaypoints: false,
+      show: false,
+      lineOptions: {
+        styles: [{ color: "#ef4444", weight: 5, opacity: 0.8 }],
+        extendToWaypoints: true,
+        missingRouteTolerance: 0,
+      },
+      router: L.Routing.osrmv1({
+        serviceUrl: "https://router.project-osrm.org/route/v1",
+      }),
+    }).addTo(map);
+
+    // Hide the default instructions panel
+    const container = control.getContainer();
+    if (container) {
+      container.style.display = "none";
+    }
+
+    // Listen for route found event
+    control.on("routesfound", (e: any) => {
+      const route = e.routes[0];
+      if (route && route.summary) {
+        const distanceKm = route.summary.totalDistance / 1000;
+        onRouteFound(distanceKm);
+      }
+    });
+
+    routingControlRef.current = control;
+
+    return () => {
+      if (routingControlRef.current && map) {
+        map.removeControl(routingControlRef.current);
+      }
+    };
+  }, [map, start, end, onRouteFound]);
+
+  return null;
+};
 
 const MapView = () => {
   const navigate = useNavigate();
@@ -37,15 +137,11 @@ const MapView = () => {
   const [nearestStation, setNearestStation] = useState<FireStation | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [userLocation, setUserLocation] = useState<google.maps.LatLngLiteral | null>(null);
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>({ lat: 28.6139, lng: 77.2090 });
-  const [directionsResponse, setDirectionsResponse] = useState<google.maps.DirectionsResult | null>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-
-  const mapContainerStyle = {
-    width: '100%',
-    height: '100%',
-  };
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>([28.6139, 77.209]);
+  const [routeStart, setRouteStart] = useState<L.LatLng | null>(null);
+  const [routeEnd, setRouteEnd] = useState<L.LatLng | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -56,10 +152,10 @@ const MapView = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const userPos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
+          const userPos: [number, number] = [
+            position.coords.latitude,
+            position.coords.longitude,
+          ];
           setUserLocation(userPos);
           setMapCenter(userPos);
         },
@@ -118,19 +214,21 @@ const MapView = () => {
     }
   };
 
-  const calculateNearestStation = async (location: Location) => {
-    setDirectionsResponse(null);
-    
+  const calculateNearestStation = (location: Location) => {
+    setRouteStart(null);
+    setRouteEnd(null);
+    setDistance(null);
+
     // Calculate distance from user's current location to the fire alert location
     if (userLocation) {
-      await drawRoute(userLocation, { lat: location.latitude, lng: location.longitude });
+      setRouteStart(L.latLng(userLocation[0], userLocation[1]));
+      setRouteEnd(L.latLng(location.latitude, location.longitude));
       return;
     }
 
     // Fallback: calculate nearest fire station
     if (fireStations.length === 0) {
       setNearestStation(null);
-      setDistance(null);
       return;
     }
 
@@ -152,13 +250,11 @@ const MapView = () => {
     });
 
     setNearestStation(nearest);
-    
+
     // Draw route from nearest fire station to alert location
     if (nearest) {
-      await drawRoute(
-        { lat: nearest.fire_station_latitude, lng: nearest.fire_station_longitude },
-        { lat: location.latitude, lng: location.longitude }
-      );
+      setRouteStart(L.latLng(nearest.fire_station_latitude, nearest.fire_station_longitude));
+      setRouteEnd(L.latLng(location.latitude, location.longitude));
     }
   };
 
@@ -176,45 +272,6 @@ const MapView = () => {
     return R * c;
   };
 
-  const drawRoute = async (start: google.maps.LatLngLiteral, end: google.maps.LatLngLiteral) => {
-    if (!window.google) return;
-
-    const directionsService = new google.maps.DirectionsService();
-
-    try {
-      const result = await directionsService.route({
-        origin: start,
-        destination: end,
-        travelMode: google.maps.TravelMode.DRIVING,
-      });
-
-      // Guard against empty or invalid results to avoid runtime errors
-      if (!result || !result.routes || result.routes.length === 0) {
-        throw new Error("No routes returned from Directions API");
-      }
-
-      setDirectionsResponse(result);
-
-      // Extract distance from the result safely
-      const firstLeg = result.routes[0]?.legs?.[0];
-      if (firstLeg?.distance) {
-        const distanceKm = firstLeg.distance.value / 1000;
-        setDistance(distanceKm);
-      }
-    } catch (error) {
-      console.error("Error calculating route:", error);
-      toast({
-        title: "Routing error",
-        description: "Unable to calculate route. Showing approximate distance.",
-        variant: "destructive",
-      });
-      
-      // Fallback to straight-line distance
-      const dist = calculateDistance(start.lat, start.lng, end.lat, end.lng);
-      setDistance(dist);
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case "alert":
@@ -227,17 +284,27 @@ const MapView = () => {
   };
 
   const getMarkerIcon = (status: string) => {
-    if (!window.google) return undefined;
-    
-    const color = status === "alert" ? "#ef4444" : status === "warning" ? "#f59e0b" : "#22c55e";
-    return {
-      path: google.maps.SymbolPath.CIRCLE,
-      fillColor: color,
-      fillOpacity: 1,
-      strokeColor: "#ffffff",
-      strokeWeight: 3,
-      scale: 12,
-    };
+    switch (status) {
+      case "alert":
+        return alertIcon;
+      case "warning":
+        return warningIcon;
+      default:
+        return normalIcon;
+    }
+  };
+
+  const handleLocationClick = (location: Location) => {
+    setSelectedLocation(location);
+    calculateNearestStation(location);
+    setMapCenter([location.latitude, location.longitude]);
+    if (mapRef.current) {
+      mapRef.current.setView([location.latitude, location.longitude], 14);
+    }
+  };
+
+  const handleRouteFound = (distanceKm: number) => {
+    setDistance(distanceKm);
   };
 
   return (
@@ -272,79 +339,67 @@ const MapView = () => {
                     <p className="text-muted-foreground">Loading map...</p>
                   </div>
                 ) : (
-                  <LoadScript googleMapsApiKey={GOOGLE_MAPS_KEY}>
-                    <GoogleMap
-                      mapContainerStyle={mapContainerStyle}
-                      center={mapCenter}
-                      zoom={11}
-                      onLoad={setMap}
-                      options={{
-                        zoomControl: true,
-                        streetViewControl: false,
-                        mapTypeControl: true,
-                        fullscreenControl: true,
-                      }}
-                    >
-                      {/* User location marker */}
-                      {userLocation && (
-                        <Marker
-                          position={userLocation}
-                          icon={{
-                            url: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-                          }}
-                          title="Your Location"
-                        />
-                      )}
+                  <MapContainer
+                    center={mapCenter}
+                    zoom={11}
+                    className="h-full w-full rounded-lg"
+                    ref={mapRef}
+                  >
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
 
-                      {/* Fire detection location markers */}
-                      {locations.map((location) => (
-                        <Marker
-                          key={location.id}
-                          position={{ lat: location.latitude, lng: location.longitude }}
-                          icon={getMarkerIcon(location.status)}
-                          title={location.name}
-                          onClick={() => {
-                            setSelectedLocation(location);
-                            calculateNearestStation(location);
-                            setMapCenter({ lat: location.latitude, lng: location.longitude });
-                            map?.panTo({ lat: location.latitude, lng: location.longitude });
-                            map?.setZoom(14);
-                          }}
-                          animation={location.status === "alert" && window.google ? google.maps.Animation.BOUNCE : undefined}
-                        />
-                      ))}
+                    {/* User location marker */}
+                    {userLocation && (
+                      <Marker position={userLocation} icon={userIcon}>
+                        <Popup>Your Location</Popup>
+                      </Marker>
+                    )}
 
-                      {/* Fire station markers */}
-                      {fireStations.map((station) => (
-                        <Marker
-                          key={station.id}
-                          position={{
-                            lat: station.fire_station_latitude,
-                            lng: station.fire_station_longitude,
-                          }}
-                          icon={{
-                            url: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
-                          }}
-                          title={`${station.fire_station} - ${station.authority_name}`}
-                        />
-                      ))}
+                    {/* Fire detection location markers */}
+                    {locations.map((location) => (
+                      <Marker
+                        key={location.id}
+                        position={[location.latitude, location.longitude]}
+                        icon={getMarkerIcon(location.status)}
+                        eventHandlers={{
+                          click: () => handleLocationClick(location),
+                        }}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-semibold">{location.name}</p>
+                            <p className="text-muted-foreground">{location.region}</p>
+                            <Badge variant="outline" className="mt-1">
+                              {location.status}
+                            </Badge>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
 
-                      {/* Direction route */}
-                      {directionsResponse && (
-                        <DirectionsRenderer
-                          directions={directionsResponse}
-                          options={{
-                            polylineOptions: {
-                              strokeColor: "#ef4444",
-                              strokeWeight: 5,
-                              strokeOpacity: 0.8,
-                            },
-                            suppressMarkers: true,
-                          }}
-                        />
-                      )}
-                    </GoogleMap>
-                  </LoadScript>
+                    {/* Fire station markers */}
+                    {fireStations.map((station) => (
+                      <Marker
+                        key={station.id}
+                        position={[station.fire_station_latitude, station.fire_station_longitude]}
+                        icon={fireStationIcon}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-semibold">🚒 {station.fire_station || "Fire Station"}</p>
+                            <p className="text-muted-foreground">{station.authority_name}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+
+                    {/* Routing control */}
+                    {routeStart && routeEnd && (
+                      <RoutingControl start={routeStart} end={routeEnd} onRouteFound={handleRouteFound} />
+                    )}
+                  </MapContainer>
                 )}
               </CardContent>
             </Card>
@@ -369,13 +424,7 @@ const MapView = () => {
                           ? "border-primary bg-primary/5"
                           : "border-border"
                       }`}
-                      onClick={() => {
-                        setSelectedLocation(location);
-                        calculateNearestStation(location);
-                        setMapCenter({ lat: location.latitude, lng: location.longitude });
-                        map?.panTo({ lat: location.latitude, lng: location.longitude });
-                        map?.setZoom(14);
-                      }}
+                      onClick={() => handleLocationClick(location)}
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -402,7 +451,7 @@ const MapView = () => {
                   <div>
                     <span className="text-sm text-muted-foreground">Alert Location</span>
                     <p className="font-medium">{selectedLocation.name}</p>
-                    <Badge 
+                    <Badge
                       variant={selectedLocation.status === "alert" ? "destructive" : "secondary"}
                       className="mt-1"
                     >
@@ -427,10 +476,10 @@ const MapView = () => {
                         </p>
                       </div>
 
-                      <Button 
-                        className="w-full" 
+                      <Button
+                        className="w-full"
                         onClick={() => {
-                          const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation.lat},${userLocation.lng}&destination=${selectedLocation.latitude},${selectedLocation.longitude}`;
+                          const url = `https://www.google.com/maps/dir/?api=1&origin=${userLocation[0]},${userLocation[1]}&destination=${selectedLocation.latitude},${selectedLocation.longitude}`;
                           window.open(url, "_blank");
                         }}
                       >
@@ -455,8 +504,8 @@ const MapView = () => {
                         </p>
                       </div>
 
-                      <Button 
-                        className="w-full" 
+                      <Button
+                        className="w-full"
                         onClick={() => {
                           const url = `https://www.google.com/maps/dir/?api=1&origin=${nearestStation.fire_station_latitude},${nearestStation.fire_station_longitude}&destination=${selectedLocation.latitude},${selectedLocation.longitude}`;
                           window.open(url, "_blank");
