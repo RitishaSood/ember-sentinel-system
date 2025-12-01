@@ -61,7 +61,7 @@ serve(async (req) => {
       // Define thresholds for alerts
       const thresholds = {
         temperature: { critical: 35 },
-        gas: { critical: 400 },
+        gas: { critical: 600 },
         flame: { detected: 'FLAME' },
         pir: { detected: '0' } // 0 = motion detected, 1 = no motion
       };
