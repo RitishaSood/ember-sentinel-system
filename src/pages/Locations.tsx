@@ -78,13 +78,7 @@ const Locations = () => {
       if (error) throw error;
 
       if (data.success) {
-        if (data.created) {
-          toast({
-            title: "Alert Created!",
-            description: `New ${data.alert.alert_type} alert detected with ${data.alert.severity} severity.`,
-            variant: "destructive",
-          });
-        } else {
+        if (!data.created) {
           toast({
             title: "Sensors Normal",
             description: data.message || "All sensors within normal range.",

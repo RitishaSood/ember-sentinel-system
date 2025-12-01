@@ -148,14 +148,7 @@ const LocationsStatus = () => {
         console.error('Error evaluating alerts:', error);
         return;
       }
-
-      if (data?.created) {
-        toast({
-          title: "🚨 Alert Created!",
-          description: `${data.alert.alert_type.toUpperCase()} detected - ${data.alert.severity} severity`,
-          variant: "destructive",
-        });
-      }
+      // Alert Created toast removed - GlobalAlertListener handles fire detection popups
     } catch (error) {
       console.error('Error calling alert-manager:', error);
     }
