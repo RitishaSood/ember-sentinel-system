@@ -5,42 +5,36 @@ import { useNavigate } from "react-router-dom";
 
 export const GlobalAlertListener = () => {
   const navigate = useNavigate();
-  const shownAlerts = useRef<Set<string>>(new Set());
+  // Track by location_id to ensure only one alert per location
+  const shownLocations = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const showAlertToast = async (alert: any) => {
       if (!alert) return;
 
-      const alertId = String(alert.id);
+      const locationId = String(alert.location_id);
       const status = (alert.status as string | null) ?? "active";
 
-      console.log("GlobalAlertListener processing alert:", {
-        alertId,
-        status,
-        type: alert.alert_type,
-        alreadyShown: shownAlerts.current.has(alertId),
-      });
-
-      // If alert has been closed / moved out of live cases, dismiss any existing toast
+      // If alert has been resolved, dismiss toast for that location
       if (status === "resolved" || status === "unsolved" || status === "false_alarm") {
-        toast.dismiss(alertId);
-        shownAlerts.current.delete(alertId);
+        toast.dismiss(locationId);
+        shownLocations.current.delete(locationId);
         return;
       }
 
-      // Only show notifications for active / in-queue alerts
+      // Only show for active / in-queue alerts
       if (status !== "active" && status !== "in_queue") {
         return;
       }
 
-      // If we've already shown this alert, skip
-      if (shownAlerts.current.has(alertId)) {
+      // Only one alert per location
+      if (shownLocations.current.has(locationId)) {
         return;
       }
 
-      shownAlerts.current.add(alertId);
+      shownLocations.current.add(locationId);
 
-      // Fetch location name for description
+      // Fetch location name
       const { data: location } = await supabase
         .from("locations")
         .select("name")
@@ -49,39 +43,61 @@ export const GlobalAlertListener = () => {
 
       const locationName = location?.name || "Unknown Location";
 
-      // Determine title based on alert type
-      let title = "";
+      // Determine alert type display
+      let typeDisplay = "";
       switch (alert.alert_type) {
         case "fire":
-          title = "🔥 FIRE DETECTED";
+          typeDisplay = "FIRE";
           break;
         case "gas_leak":
-          title = "💨 GAS LEAK DETECTED";
+          typeDisplay = "GAS LEAK";
           break;
         case "temperature":
-          title = "🌡️ HIGH TEMPERATURE";
+          typeDisplay = "HIGH TEMPERATURE";
           break;
         default:
-          title = "⚠️ ALERT";
+          typeDisplay = alert.alert_type?.toUpperCase() || "ALERT";
       }
 
-      const description = `Location: ${locationName} | Severity: ${String(alert.severity ?? "").toUpperCase()}`;
-
-      console.log("Creating sonner toast for alert:", alertId, title);
-
-      // Use sonner toast with infinite duration
-      toast.error(title, {
-        id: alertId,
-        description,
-        duration: Infinity,
-        action: {
-          label: "View Details",
-          onClick: () => navigate(`/alert/${alert.id}`),
-        },
-        onDismiss: () => {
-          shownAlerts.current.delete(alertId);
-        },
-      });
+      // Show toast with custom styling
+      toast.custom(
+        (t) => (
+          <div
+            className="bg-black text-white p-4 rounded-lg shadow-2xl border border-gray-700 min-w-[300px] cursor-pointer"
+            onClick={() => navigate(`/alert/${alert.id}`)}
+          >
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-red-500">
+                  🔥 FIRE DETECTED!
+                </h3>
+                <p className="text-sm">
+                  <span className="text-gray-400">LOCATION:</span>{" "}
+                  <span className="font-semibold">{locationName}</span>
+                </p>
+                <p className="text-sm">
+                  <span className="text-gray-400">TYPE:</span>{" "}
+                  <span className="font-semibold">{typeDisplay}</span>
+                </p>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toast.dismiss(t);
+                  shownLocations.current.delete(locationId);
+                }}
+                className="text-gray-400 hover:text-white text-xl font-bold ml-4"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ),
+        {
+          id: locationId,
+          duration: Infinity,
+        }
+      );
 
       // Play alert sound
       try {
@@ -97,19 +113,15 @@ export const GlobalAlertListener = () => {
       showAlertToast(alert);
     };
 
-    // Fetch existing active alerts on mount
+    // Fetch existing active alerts on mount - one per location
     const fetchExistingAlerts = async () => {
-      console.log("Fetching existing active alerts...");
-      const { data: alerts, error } = await supabase
+      const { data: alerts } = await supabase
         .from("alerts")
         .select("*")
         .in("status", ["active", "in_queue"])
         .order("created_at", { ascending: false });
 
-      console.log("Fetched alerts:", alerts?.length, error);
-
       if (alerts && alerts.length > 0) {
-        // Only show toast for the most recent alert per location
         const seenLocations = new Set<string>();
         for (const alert of alerts) {
           if (!seenLocations.has(alert.location_id)) {
