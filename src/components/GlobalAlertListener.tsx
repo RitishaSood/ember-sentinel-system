@@ -1,13 +1,11 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { Flame, Wind, Gauge, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 
 export const GlobalAlertListener = () => {
   const navigate = useNavigate();
   const shownAlerts = useRef<Set<string>>(new Set());
-  const alertToasts = useRef<Map<string, { dismiss: () => void }>>(new Map());
 
   useEffect(() => {
     const showAlertToast = async (alert: any) => {
@@ -20,15 +18,12 @@ export const GlobalAlertListener = () => {
         alertId,
         status,
         type: alert.alert_type,
+        alreadyShown: shownAlerts.current.has(alertId),
       });
 
       // If alert has been closed / moved out of live cases, dismiss any existing toast
       if (status === "resolved" || status === "unsolved" || status === "false_alarm") {
-        const existing = alertToasts.current.get(alertId);
-        if (existing) {
-          existing.dismiss();
-          alertToasts.current.delete(alertId);
-        }
+        toast.dismiss(alertId);
         shownAlerts.current.delete(alertId);
         return;
       }
@@ -38,7 +33,7 @@ export const GlobalAlertListener = () => {
         return;
       }
 
-      // If we've already shown this alert, keep the existing toast (no re-pop)
+      // If we've already shown this alert, skip
       if (shownAlerts.current.has(alertId)) {
         return;
       }
@@ -70,31 +65,28 @@ export const GlobalAlertListener = () => {
           title = "⚠️ ALERT";
       }
 
-      const description = `Location: ${locationName}\nSeverity: ${String(alert.severity ?? "").toUpperCase()}`;
+      const description = `Location: ${locationName} | Severity: ${String(alert.severity ?? "").toUpperCase()}`;
 
-      const handle = toast({
-        title,
+      console.log("Creating sonner toast for alert:", alertId, title);
+
+      // Use sonner toast with infinite duration
+      toast.error(title, {
+        id: alertId,
         description,
-        variant: "destructive",
         duration: Infinity,
-        action: (
-          <button
-            onClick={() => navigate(`/alert/${alert.id}`)}
-            className="px-3 py-2 text-sm font-medium bg-white text-destructive rounded-md hover:bg-white/90 transition-colors"
-          >
-            View Details
-          </button>
-        ),
+        action: {
+          label: "View Details",
+          onClick: () => navigate(`/alert/${alert.id}`),
+        },
+        onDismiss: () => {
+          shownAlerts.current.delete(alertId);
+        },
       });
 
-      alertToasts.current.set(alertId, { dismiss: handle.dismiss });
-
-      // Play alert sound when toast is first created
+      // Play alert sound
       try {
         const audio = new Audio("/alert-sound.mp3");
-        audio.play().catch(() => {
-          // Ignore audio errors
-        });
+        audio.play().catch(() => {});
       } catch {
         // Ignore audio errors
       }
@@ -107,15 +99,23 @@ export const GlobalAlertListener = () => {
 
     // Fetch existing active alerts on mount
     const fetchExistingAlerts = async () => {
-      const { data: alerts } = await supabase
+      console.log("Fetching existing active alerts...");
+      const { data: alerts, error } = await supabase
         .from("alerts")
         .select("*")
         .in("status", ["active", "in_queue"])
         .order("created_at", { ascending: false });
 
-      if (alerts) {
+      console.log("Fetched alerts:", alerts?.length, error);
+
+      if (alerts && alerts.length > 0) {
+        // Only show toast for the most recent alert per location
+        const seenLocations = new Set<string>();
         for (const alert of alerts) {
-          await showAlertToast(alert);
+          if (!seenLocations.has(alert.location_id)) {
+            seenLocations.add(alert.location_id);
+            await showAlertToast(alert);
+          }
         }
       }
     };
